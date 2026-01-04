@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:lftapp/services/permission_handler.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -56,7 +57,10 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Future<void> _pickAssets() async {
-    final List<XFile> images = await _picker.pickMultiImage(imageQuality: 50);
+    final List<XFile> images = await _picker.pickMultiImage(
+      imageQuality: 50,
+      maxWidth: 1000,
+    );
     if (images.isNotEmpty) {
       setState(() => _assetImages.addAll(images.map((img) => File(img.path))));
     }
@@ -64,7 +68,11 @@ class _UploadPageState extends State<UploadPage> {
 
   // --- UPLOAD LOGIC ---
   Future<void> _handleSubmit() async {
+    bool isReady = await PermissionService.checkLocationRequirements(context);
+    if (!isReady) return;
+
     setState(() => _isUploading = true);
+
     try {
       Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       String userId = FirebaseAuth.instance.currentUser!.uid;
