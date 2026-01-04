@@ -22,6 +22,8 @@ class LoansPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('loans')
             .where('userId', isEqualTo: uid)
+        // Tip: If you want these ordered by time, add .orderBy('createdAt', descending: true)
+        // Note: This may require creating a Firestore Index via the link in your console.
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -52,9 +54,12 @@ class LoansPage extends StatelessWidget {
             itemCount: loans.length,
             itemBuilder: (context, index) {
               final loan = loans[index].data() as Map<String, dynamic>;
+
+              // Handle field names carefully (checking both camelCase and snake_case)
               final String status = (loan['status'] ?? 'unknown').toString().toLowerCase();
               final createdAt = (loan['createdAt'] as Timestamp?)?.toDate();
-              final String? rejectionReason = loan['rejectionReason'];
+              final String? rejectionReason = loan['rejectionReason'] ?? loan['rejection_reason'];
+              final String productName = loan['productName'] ?? loan['product_name'] ?? "Loan Application";
 
               Color statusColor;
               IconData statusIcon;
@@ -69,11 +74,14 @@ class LoansPage extends StatelessWidget {
                   statusIcon = Icons.cancel;
                   break;
                 case 'pending':
+                case 'ai_pending':
+                case 'initialised':
                   statusColor = Colors.orange;
                   statusIcon = Icons.pending_actions;
+                  break;
                 default:
-                  statusColor = Colors.orange;
-                  statusIcon = Icons.pending_actions;
+                  statusColor = Colors.grey;
+                  statusIcon = Icons.help_outline;
                   break;
               }
 
@@ -128,28 +136,40 @@ class LoansPage extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          "Personal Loan Application",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
-                          "Applied on: ${createdAt?.toLocal().toString().split('.')[0] ?? 'N/A'}",
+                          productName,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Applied on: ${createdAt?.toLocal().toString().split('.')[0] ?? 'Processing...'}",
                           style: TextStyle(color: Colors.grey[600], fontSize: 13),
                         ),
-                        if (status == 'rejected' && rejectionReason != null) ...[
+
+                        // --- REJECTION REASON SECTION ---
+                        if (status == 'rejected') ...[
                           const Divider(height: 24),
-                          const Text(
-                            "Rejection Reason:",
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Colors.red, size: 14),
+                              const SizedBox(width: 4),
+                              const Text(
+                                "REJECTION REASON:",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 12),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            rejectionReason,
-                            style: const TextStyle(color: Colors.black87, fontSize: 13),
+                            rejectionReason ?? "No reason given.",
+                            style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic
+                            ),
                           ),
-                        ],
+                        ]
                       ],
                     ),
                   ),

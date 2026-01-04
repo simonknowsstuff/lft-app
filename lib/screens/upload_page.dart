@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lftapp/screens/loans_page.dart';
 import 'package:lftapp/services/permission_handler.dart';
 import 'package:lftapp/services/upload_service.dart';
@@ -19,14 +19,24 @@ class _UploadPageState extends State<UploadPage> {
   File? _billFile;
   final List<File> _assetImages = [];
   bool _isUploading = false;
+
   final ImagePicker _picker = ImagePicker();
   final UploadService _uploadService = UploadService();
+
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _borrowerNameController = TextEditingController();
+
   final List<String> _assetTypes = ["general", "vehicle", "real_estate", "agricultural"];
   String? _selectedAssetType;
 
-  // --- LOGOUT LOGIC ---
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _borrowerNameController.dispose();
+    super.dispose();
+  }
+
+  // --- LOGOUT ---
   Future<void> _logout() async {
     bool? confirm = await showDialog(
       context: context,
@@ -42,14 +52,16 @@ class _UploadPageState extends State<UploadPage> {
         ],
       ),
     );
-
-    if (confirm == true) {
-      await FirebaseAuth.instance.signOut();
-    }
+    if (confirm == true) await FirebaseAuth.instance.signOut();
   }
 
   // --- VALIDATION ---
-  bool get _isValid => _billFile != null && _assetImages.length >= 3;
+  bool get _isValid =>
+      _billFile != null &&
+          _assetImages.length >= 3 &&
+          _selectedAssetType != null &&
+          _borrowerNameController.text.isNotEmpty &&
+          _amountController.text.isNotEmpty;
 
   // --- FILE PICKING ---
   Future<void> _pickBill() async {
@@ -63,10 +75,7 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Future<void> _pickAssets() async {
-    final List<XFile> images = await _picker.pickMultiImage(
-      imageQuality: 50,
-      maxWidth: 1000,
-    );
+    final List<XFile> images = await _picker.pickMultiImage(imageQuality: 50);
     if (images.isNotEmpty) {
       setState(() => _assetImages.addAll(images.map((img) => File(img.path))));
     }
@@ -80,7 +89,6 @@ class _UploadPageState extends State<UploadPage> {
     setState(() => _isUploading = true);
 
     try {
-      // 2. Call the dedicated UploadService
       await _uploadService.processLoanVerification(
         billFile: _billFile!,
         assetImages: _assetImages,
@@ -89,24 +97,22 @@ class _UploadPageState extends State<UploadPage> {
         selectedAssetType: _selectedAssetType!,
       );
 
-      // 3. Success UI
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Upload Successful! Verification pending.")),
+        const SnackBar(content: Text("Audit Submitted! Check 'My Loans' for results.")),
       );
 
       setState(() {
         _billFile = null;
         _assetImages.clear();
+        _amountController.clear();
+        _borrowerNameController.clear();
+        _selectedAssetType = null;
       });
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       setState(() => _isUploading = false);
-      _amountController.text = "";
-      _borrowerNameController.text = "";
     }
   }
 
@@ -117,112 +123,116 @@ class _UploadPageState extends State<UploadPage> {
       appBar: AppBar(
         title: const Text("Loan For Tomorrow", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [IconButton(icon: const Icon(Icons.logout, color: Colors.red), onPressed: _logout)],
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.logout, color: Colors.red),
+              onPressed: _isUploading ? null : _logout
+          )
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextFormField(
-              controller: _borrowerNameController,
-              decoration: const InputDecoration(
-                labelText: "Borrower's name",
-                border: OutlineInputBorder(),
-                hintText: "Borrower's name",
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return "Please enter the borrower's name";
-                }
-                if (value.length < 5) {
-                  return "Names cannot be lesser than 5 letters";
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-            _buildPanel(
-              title: "Purchase Bill / Invoice",
-              subtitle: _billFile == null ? "PDF or Image required" : "Attached: ${_billFile!.path.split('/').last}",
-              icon: Icons.receipt_long,
-              isDone: _billFile != null,
-              onTap: _pickBill,
-            ),
-            const SizedBox(height: 20),
-            _buildAssetPanel(),
-            const SizedBox(height: 40),
-            TextFormField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Loan Amount',
-                prefixText: '\Rs ', // Or your local currency symbol
-                border: OutlineInputBorder(),
-                hintText: '0.00',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter the loan amount';
-                }
-                if (double.tryParse(value) == null) {
-                  return 'Please enter a valid number';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedAssetType,
-              decoration: const InputDecoration(
-                labelText: "Select Asset Type",
-                border: OutlineInputBorder(),
-              ),
-              items: _assetTypes.map((String type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type.toUpperCase()),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedAssetType = value),
-              validator: (value) => value == null ? "Please select an asset type" : null,
-            ),
-            const SizedBox(height: 15),
-            SizedBox(
-              width: double.infinity, height: 55,
-              child: ElevatedButton(
-                onPressed: (_isValid && !_isUploading) ? _handleSubmit : null,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+      // AbsorbPointer completely blocks interaction during upload
+      body: AbsorbPointer(
+        absorbing: _isUploading,
+        child: Opacity(
+          opacity: _isUploading ? 0.6 : 1.0,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildTextField(_borrowerNameController, "Borrower's Full Name", Icons.person),
+                const SizedBox(height: 20),
+
+                _buildPanel(
+                  title: "Purchase Bill / Invoice",
+                  subtitle: _billFile == null ? "PDF or Image required" : "Attached: ${_billFile!.path.split('/').last}",
+                  icon: Icons.receipt_long,
+                  isDone: _billFile != null,
+                  onTap: _pickBill,
                 ),
-                child: _isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text("SUBMIT EVIDENCE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
+
+                const SizedBox(height: 20),
+                _buildAssetPanel(),
+                const SizedBox(height: 20),
+
+                _buildTextField(_amountController, "Loan Amount", Icons.attach_money, isNumber: true),
+                const SizedBox(height: 20),
+
+                DropdownButtonFormField<String>(
+                  value: _selectedAssetType,
+                  decoration: const InputDecoration(
+                    labelText: "Select Asset Type",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(15))),
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  items: _assetTypes.map((type) => DropdownMenuItem(
+                      value: type,
+                      child: Text(type.toUpperCase())
+                  )).toList(),
+                  onChanged: (val) => setState(() => _selectedAssetType = val),
+                ),
+
+                const SizedBox(height: 30),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: (_isValid && !_isUploading) ? _handleSubmit : null,
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                    ),
+                    child: _isUploading
+                        ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                        SizedBox(width: 15),
+                        Text("AI FORENSIC AUDIT...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ],
+                    )
+                        : const Text("SUBMIT FOR VERIFICATION", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: _isUploading ? null : () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LoansPage())),
+                  child: const Text("VIEW MY LOAN STATUS", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
-            const SizedBox(height: 15),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoansPage()),
-                );
-              },
-              child: const Text("VIEW MY LOANS", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  // --- WIDGET BUILDERS ---
+
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isNumber = false}) {
+    return TextFormField(
+      controller: controller,
+      enabled: !_isUploading,
+      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
       ),
     );
   }
 
   Widget _buildPanel({required String title, required String subtitle, required IconData icon, required bool isDone, required VoidCallback onTap}) {
     return InkWell(
-      onTap: onTap,
+      onTap: _isUploading ? null : onTap,
+      borderRadius: BorderRadius.circular(15),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isDone ? Colors.green : Colors.blueAccent.withValues(alpha: 0.3)),
-          color: isDone ? Colors.green.withValues(alpha: 0.05) : Colors.blue.withValues(alpha: 0.02),
+          border: Border.all(color: isDone ? Colors.green : Colors.blueAccent.withOpacity(0.3)),
+          color: isDone ? Colors.green.withOpacity(0.05) : Colors.blue.withOpacity(0.02),
         ),
         child: Row(
           children: [
@@ -242,12 +252,12 @@ class _UploadPageState extends State<UploadPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: isDone ? Colors.green : Colors.orange.withValues(alpha: 0.3)),
-        color: isDone ? Colors.green.withValues(alpha: 0.05) : Colors.orange.withValues(alpha: 0.02),
+        border: Border.all(color: isDone ? Colors.green : Colors.orange.withOpacity(0.3)),
+        color: isDone ? Colors.green.withOpacity(0.05) : Colors.orange.withOpacity(0.02),
       ),
       child: Column(
         children: [
-          Row(children: [const Icon(Icons.camera_alt), const SizedBox(width: 10), const Text("Asset Photos (Min 3)", style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), Text("${_assetImages.length}/3")]),
+          Row(children: [const Icon(Icons.camera_alt, color: Colors.orange), const SizedBox(width: 10), const Text("Asset Photos (Min 3)", style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), Text("${_assetImages.length}/3")]),
           const SizedBox(height: 10),
           if (_assetImages.isNotEmpty)
             SizedBox(
@@ -255,10 +265,16 @@ class _UploadPageState extends State<UploadPage> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: _assetImages.length,
-                itemBuilder: (ctx, i) => Padding(padding: const EdgeInsets.only(right: 8), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(_assetImages[i], width: 70, height: 70, fit: BoxFit.cover))),
+                itemBuilder: (ctx, i) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(_assetImages[i], width: 70, height: 70, fit: BoxFit.cover))
+                ),
               ),
             ),
-          TextButton(onPressed: _pickAssets, child: const Text("Add Images")),
+          TextButton(
+              onPressed: _isUploading ? null : _pickAssets,
+              child: Text(_assetImages.isEmpty ? "Add Images" : "Add More Images")
+          ),
         ],
       ),
     );

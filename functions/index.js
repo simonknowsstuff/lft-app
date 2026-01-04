@@ -157,6 +157,7 @@ exports.processLoanImage = onObjectFinalized({
                       TASK 3: EXTRACTION
                       - If there is a mismatch between the selected asset type of the user from the images from the actual images, lower the confidence score significantly.
                       - Extract the exact Amount from the Bill.
+                      - If the bill does not match with the asset images uploaded, lower the confidence score significantly.
                       - Make the summary as descriptive as possible.
                     
                       RETURN ONLY JSON:
@@ -197,10 +198,10 @@ exports.processLoanImage = onObjectFinalized({
                 summary: ai.summary ?? "Batch analysis complete.",
                 amount: ai.amount || 0,
                 assetType: ai.assetType || "general",
-                status: "PENDING", // Moves to Pending for human review
+                status: "PENDING",
                 isHandwritten: ai.isHandwritten || false,
                 isDuplicate: ai.isDuplicate || false,
-                lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             });
 
         } catch (e) {
