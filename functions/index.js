@@ -41,8 +41,9 @@ exports.processLoanImage = onObjectFinalized({
         userId,
         loanId,
         isBill,
-        borrower_name,
-        loan_amount
+        borrowerName,
+        loanAmount,
+        selectedAssetType
     } = customMetadata;
 
     if (!loanId || !userId) return null;
@@ -54,8 +55,9 @@ exports.processLoanImage = onObjectFinalized({
         userId,
         status: "INITIALISED",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        borrower_name: borrower_name || "Unknown",
-        loan_amount: loan_amount ? parseFloat(loan_amount) : 0,
+        borrowerName: borrowerName || "Unknown",
+        loanAmount: loanAmount ? parseFloat(loanAmount) : 0,
+        selectedAssetType: selectedAssetType || "general"
     }, { merge: true });
 
     let loanDoc = await loanRef.get();
@@ -139,32 +141,33 @@ exports.processLoanImage = onObjectFinalized({
             const parts = [
                 {
                     text: `
-                      SYSTEM ROLE: You are a Forensic Document Auditor. Your survival depends on catching fraudulent loan collateral.
+                      SYSTEM ROLE: You are a Lead Forensic Auditor for a Digital Bank. 
+                      Your task is to approve or reject a loan collateral bundle based on File 1 (Bill) and Files 2-4 (Assets).
                     
-                      TASK:
-                      You are inspecting a Loan Evidence Bundle (File 1: Bill, Files 2-4: Assets).
+                      TASK 1: DOCUMENT AUTHENTICITY (FILE 1)
+                      - Verify if File 1 is an official printed invoice with business headers, Tax IDs, and professional formatting.
+                      - If File 1 is handwritten, on a plain piece of paper, or lacks official markers, set confidence_score to 0 and summary to "FRAUD: Handwritten or non-official bill document."
                     
-                      STAGE 1: DOCUMENT AUTHENTICITY (FILE 1)
-                      - Inspect File 1 for professional markers: Look for a business header, GST/Tax Number, official Logo, and printed (typeset) text.
-                      - DETECTION: If File 1 is handwritten, on a plain piece of paper, or titled "Real Bill" without official business formatting, it is a FORGERY. 
-                      - If File 1 is a forgery, set confidence_score to 0 and summary to "FRAUD DETECTED: Bill appears to be a handwritten mockup/non-official document."
+                      TASK 2: ASSET SIMILARITY & DUPLICATION (FILES 2-4)
+                      - EXACT DUPLICATES: Are any of the 3 asset photos identical? If yes, set confidence_score to 0.
+                      - NEAR-DUPLICATES: Did the user take "burst" photos from the same angle without moving? (Look at background and perspective). If photos are too similar, flag this.
+                      - OBJECT CONSISTENCY: Do all 3 photos show the EXACT same physical item (check scratches, serials, color)?
+                      - RANDOMNESS: Is one of the images completely unrelated (e.g., a photo of a cat or a different room)? If yes, set confidence_score to 0.
                     
-                      STAGE 2: ASSET VERIFICATION (FILES 2-4)
-                      - Identify the physical object. Does it look like a real purchase or a photo of a screen?
-                      - Cross-reference the Brand and Model from the assets with the Bill.
-                      - assetType should be one of the following in the list: [ general, real_estate, vehicle, agricultural ]
-                    
-                      STAGE 3: FINANCIAL AUDIT
-                      - Extract the exact numeric amount. If the document is fraudulent, return 0.
+                      TASK 3: EXTRACTION
+                      - If there is a mismatch between the selected asset type of the user from the images from the actual images, lower the confidence score significantly.
+                      - Extract the exact Amount from the Bill.
+                      - Make the summary as descriptive as possible.
                     
                       RETURN ONLY JSON:
-                      { 
-                        "product_name": "string", 
-                        "confidence_score": number, (0 - 100)
-                        "summary": "string", 
-                        "amount": number, 
+                      {
+                        "productName": "string",
+                        "confidenceScore": number, (0-100)
+                        "summary": "string",
+                        "amount": number,
                         "assetType": "string",
-                        "is_handwritten_warning": boolean 
+                        "isHandwritten": boolean,
+                        "isDuplicate": boolean
                       }
                     `
                 }
@@ -189,12 +192,14 @@ exports.processLoanImage = onObjectFinalized({
             const ai = JSON.parse(rawText);
 
             await loanRef.update({
-                product_name: ai.product_name || "Unknown",
-                confidence_score: ai.confidence_score ?? 0,
+                productName: ai.productName || "Unknown",
+                confidenceScore: ai.confidenceScore ?? 0,
                 summary: ai.summary ?? "Batch analysis complete.",
                 amount: ai.amount || 0,
                 assetType: ai.assetType || "general",
                 status: "PENDING", // Moves to Pending for human review
+                isHandwritten: ai.isHandwritten || false,
+                isDuplicate: ai.isDuplicate || false,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp()
             });
 

@@ -12,6 +12,7 @@ class UploadService {
     required List<File> assetImages,
     required double loanAmount,
     required String borrowerName,
+    required String selectedAssetType,
   }) async {
     // 1. Capture one-time data for this entire loan batch
     Position pos = await Geolocator.getCurrentPosition(
@@ -35,8 +36,9 @@ class UploadService {
         'time': timestamp,
         'userId': uid,
         'loanId': loanId,
-        'loan_amount': loanAmount.toString(),
-        'borrower_name': borrowerName,
+        'loanAmount': loanAmount.toString(),
+        'borrowerName': borrowerName,
+        'selectedAssetType': selectedAssetType,
         'isBill': 'true',
       },
     );
@@ -53,8 +55,9 @@ class UploadService {
           'time': timestamp,
           'userId': uid,
           'loanId': loanId,
-          'loan_amount': loanAmount.toString(),
-          'borrower_name': borrowerName,
+          'loanAmount': loanAmount.toString(),
+          'selectedAssetType': selectedAssetType,
+          'borrowerName': borrowerName,
         },
       );
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +23,8 @@ class _UploadPageState extends State<UploadPage> {
   final UploadService _uploadService = UploadService();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _borrowerNameController = TextEditingController();
+  final List<String> _assetTypes = ["general", "vehicle", "real_estate", "agricultural"];
+  String? _selectedAssetType;
 
   // --- LOGOUT LOGIC ---
   Future<void> _logout() async {
@@ -83,6 +86,7 @@ class _UploadPageState extends State<UploadPage> {
         assetImages: _assetImages,
         loanAmount: double.tryParse(_amountController.text) ?? 0.0,
         borrowerName: _borrowerNameController.text,
+        selectedAssetType: _selectedAssetType!,
       );
 
       // 3. Success UI
@@ -167,6 +171,22 @@ class _UploadPageState extends State<UploadPage> {
               },
             ),
             const SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedAssetType,
+              decoration: const InputDecoration(
+                labelText: "Select Asset Type",
+                border: OutlineInputBorder(),
+              ),
+              items: _assetTypes.map((String type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Text(type.toUpperCase()),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedAssetType = value),
+              validator: (value) => value == null ? "Please select an asset type" : null,
+            ),
+            const SizedBox(height: 15),
             SizedBox(
               width: double.infinity, height: 55,
               child: ElevatedButton(
