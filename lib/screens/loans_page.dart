@@ -60,7 +60,7 @@ class LoansPage extends StatelessWidget {
               IconData statusIcon;
 
               switch (status) {
-                case 'approved':
+                case 'verified':
                   statusColor = Colors.green;
                   statusIcon = Icons.check_circle;
                   break;
@@ -69,6 +69,8 @@ class LoansPage extends StatelessWidget {
                   statusIcon = Icons.cancel;
                   break;
                 case 'pending':
+                  statusColor = Colors.orange;
+                  statusIcon = Icons.pending_actions;
                 default:
                   statusColor = Colors.orange;
                   statusIcon = Icons.pending_actions;
