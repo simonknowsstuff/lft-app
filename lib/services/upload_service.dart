@@ -33,10 +33,11 @@ class UploadService {
         'time': timestamp,
         'userId': uid,
         'loanId': loanId,
+        'isBill': 'true',
       },
     );
 
-    await _storage.ref('loans/$uid/$loanId/bill$billExt').putFile(billFile, billMeta);
+    await _storage.ref('loans/$uid/$loanId/bill_document$billExt').putFile(billFile, billMeta);
 
     // 3. Upload Asset Images
     for (int i = 0; i < assetImages.length; i++) {
