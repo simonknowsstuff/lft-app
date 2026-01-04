@@ -20,6 +20,8 @@ class _UploadPageState extends State<UploadPage> {
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
   final UploadService _uploadService = UploadService();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _borrowerNameController = TextEditingController();
 
   // --- LOGOUT LOGIC ---
   Future<void> _logout() async {
@@ -76,10 +78,11 @@ class _UploadPageState extends State<UploadPage> {
 
     try {
       // 2. Call the dedicated UploadService
-      // Make sure you have: final _uploadService = UploadService(); at the top of your class
       await _uploadService.processLoanVerification(
         billFile: _billFile!,
         assetImages: _assetImages,
+        loanAmount: double.tryParse(_amountController.text) ?? 0.0,
+        borrowerName: _borrowerNameController.text,
       );
 
       // 3. Success UI
@@ -98,6 +101,8 @@ class _UploadPageState extends State<UploadPage> {
       );
     } finally {
       setState(() => _isUploading = false);
+      _amountController.text = "";
+      _borrowerNameController.text = "";
     }
   }
 
@@ -114,6 +119,24 @@ class _UploadPageState extends State<UploadPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            TextFormField(
+              controller: _borrowerNameController,
+              decoration: const InputDecoration(
+                labelText: "Borrower's name",
+                border: OutlineInputBorder(),
+                hintText: "Borrower's name",
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return "Please enter the borrower's name";
+                }
+                if (value.length < 5) {
+                  return "Names cannot be lesser than 5 letters";
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
             _buildPanel(
               title: "Purchase Bill / Invoice",
               subtitle: _billFile == null ? "PDF or Image required" : "Attached: ${_billFile!.path.split('/').last}",
@@ -124,6 +147,26 @@ class _UploadPageState extends State<UploadPage> {
             const SizedBox(height: 20),
             _buildAssetPanel(),
             const SizedBox(height: 40),
+            TextFormField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Loan Amount',
+                prefixText: '\Rs ', // Or your local currency symbol
+                border: OutlineInputBorder(),
+                hintText: '0.00',
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter the loan amount';
+                }
+                if (double.tryParse(value) == null) {
+                  return 'Please enter a valid number';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity, height: 55,
               child: ElevatedButton(

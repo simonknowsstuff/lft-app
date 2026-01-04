@@ -10,6 +10,8 @@ class UploadService {
   Future<void> processLoanVerification({
     required File billFile,
     required List<File> assetImages,
+    required double loanAmount,
+    required String borrowerName,
   }) async {
     // 1. Capture one-time data for this entire loan batch
     Position pos = await Geolocator.getCurrentPosition(
@@ -17,7 +19,7 @@ class UploadService {
         accuracy: LocationAccuracy.best
       ),
     );
-    String timestamp = DateTime.now().toIso8601String();
+    String timestamp = DateTime.now().toUtc().toIso8601String();
     String uid = FirebaseAuth.instance.currentUser!.uid;
     String loanId = "LN_${DateTime.now().millisecondsSinceEpoch}";
 
@@ -33,6 +35,8 @@ class UploadService {
         'time': timestamp,
         'userId': uid,
         'loanId': loanId,
+        'loan_amount': loanAmount.toString(),
+        'borrower_name': borrowerName,
         'isBill': 'true',
       },
     );
@@ -49,6 +53,8 @@ class UploadService {
           'time': timestamp,
           'userId': uid,
           'loanId': loanId,
+          'loan_amount': loanAmount.toString(),
+          'borrower_name': borrowerName,
         },
       );
 

@@ -49,6 +49,7 @@ app.*.map.json
 .env.*
 service-account-file.json
 functions/.env
+functions/node_modules
 
 # Mobile specific
 *.keystore
