@@ -53,3 +53,6 @@ functions/.env
 # Mobile specific
 *.keystore
 *.jks
+
+# Secrets
+secret.dart
