@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lftapp/screens/loans_page.dart';
 import 'package:lftapp/services/permission_handler.dart';
 import 'package:lftapp/services/upload_service.dart';
 
@@ -134,7 +135,16 @@ class _UploadPageState extends State<UploadPage> {
                 child: _isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text("SUBMIT EVIDENCE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
-
+            const SizedBox(height: 15),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoansPage()),
+                );
+              },
+              child: const Text("VIEW MY LOANS", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
