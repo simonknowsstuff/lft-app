@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:lftapp/services/permission_handler.dart';
+import 'package:lftapp/services/upload_service.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -19,6 +18,7 @@ class _UploadPageState extends State<UploadPage> {
   final List<File> _assetImages = [];
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
+  final UploadService _uploadService = UploadService();
 
   // --- LOGOUT LOGIC ---
   Future<void> _logout() async {
@@ -74,31 +74,27 @@ class _UploadPageState extends State<UploadPage> {
     setState(() => _isUploading = true);
 
     try {
-      Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      String userId = FirebaseAuth.instance.currentUser!.uid;
+      // 2. Call the dedicated UploadService
+      // Make sure you have: final _uploadService = UploadService(); at the top of your class
+      await _uploadService.processLoanVerification(
+        billFile: _billFile!,
+        assetImages: _assetImages,
+      );
 
-      // Upload Bill
-      String billName = "bill_${DateTime.now().millisecondsSinceEpoch}.pdf";
-      await FirebaseStorage.instance.ref('loans/$userId/$billName').putFile(_billFile!);
+      // 3. Success UI
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Upload Successful! Verification pending.")),
+      );
 
-      // Upload Assets with Geotags
-      for (var i = 0; i < _assetImages.length; i++) {
-        String assetName = "asset_${i}_${DateTime.now().millisecondsSinceEpoch}.jpg";
-        await FirebaseStorage.instance.ref('loans/$userId/$assetName').putFile(
-          _assetImages[i],
-          SettableMetadata(customMetadata: {
-            'lat': pos.latitude.toString(),
-            'lng': pos.longitude.toString(),
-            'timestamp': DateTime.now().toIso8601String(),
-            'userId': userId,
-          }),
-        );
-      }
+      setState(() {
+        _billFile = null;
+        _assetImages.clear();
+      });
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Upload Successful!")));
-      setState(() { _billFile = null; _assetImages.clear(); });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     } finally {
       setState(() => _isUploading = false);
     }
@@ -138,6 +134,7 @@ class _UploadPageState extends State<UploadPage> {
                 child: _isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text("SUBMIT EVIDENCE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
+
           ],
         ),
       ),

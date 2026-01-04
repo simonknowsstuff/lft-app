@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path/path.dart' as p;
 
@@ -12,28 +11,22 @@ class UploadService {
     required File billFile,
     required List<File> assetImages,
   }) async {
-    // 1. Prepare shared metadata
-    Position pos = await Geolocator.getCurrentPosition();
+    // 1. Capture one-time data for this entire loan batch
+    Position pos = await Geolocator.getCurrentPosition(
+      locationSettings: AndroidSettings(
+        accuracy: LocationAccuracy.best
+      ),
+    );
     String timestamp = DateTime.now().toIso8601String();
     String uid = FirebaseAuth.instance.currentUser!.uid;
-    // TODO: Loan ID seems to not be uploading properly
-    String loanId = "LOAN_${DateTime.now().millisecondsSinceEpoch}";
+    String loanId = "LN_${DateTime.now().millisecondsSinceEpoch}";
 
-    final metadata = SettableMetadata(
-      customMetadata: {
-        'lat': pos.latitude.toString(),
-        'lng': pos.longitude.toString(),
-        'time': timestamp,
-        'userId': uid,
-        'loanId': loanId,
-      },
-    );
-
-    String extension = p.extension(billFile.path).toLowerCase();
-    String billMimeType = (extension == '.pdf') ? 'application/pdf' : 'image/jpeg';
+    // 2. Upload the Bill (Detect if PDF or Image)
+    String billExt = p.extension(billFile.path).toLowerCase();
+    String billMime = (billExt == '.pdf') ? 'application/pdf' : 'image/jpeg';
 
     final billMeta = SettableMetadata(
-      contentType: billMimeType,
+      contentType: billMime,
       customMetadata: {
         'lat': pos.latitude.toString(),
         'lng': pos.longitude.toString(),
@@ -43,22 +36,25 @@ class UploadService {
       },
     );
 
-    UploadTask billTask = _storage.ref('loans/$loanId/bill.pdf').putFile(billFile, billMeta);
-    await billTask;
+    await _storage.ref('loans/$uid/$loanId/bill$billExt').putFile(billFile, billMeta);
 
-    // 3. Upload Assets
+    // 3. Upload Asset Images
     for (int i = 0; i < assetImages.length; i++) {
-      Reference ref = _storage.ref('loans/$loanId/assets_$i.jpg');
-      UploadTask assetTask = ref.putFile(assetImages[i], metadata);
-      assetTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        if (kDebugMode) {
-          print('Progress: ${snapshot.bytesTransferred / snapshot.totalBytes}');
-        }
-      });
-      await assetTask;
-      if (kDebugMode) {
-        print("Uploaded asset $i with loanId: $loanId");
-      }
+      final assetMeta = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {
+          'lat': pos.latitude.toString(),
+          'lng': pos.longitude.toString(),
+          'time': timestamp,
+          'userId': uid,
+          'loanId': loanId,
+        },
+      );
+
+      // We use putFile and await it to ensure order
+      await _storage
+          .ref('loans/$uid/$loanId/asset_$i.jpg')
+          .putFile(assetImages[i], assetMeta);
     }
   }
 }
