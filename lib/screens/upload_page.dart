@@ -143,8 +143,8 @@ class _UploadPageState extends State<UploadPage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isDone ? Colors.green : Colors.blueAccent.withOpacity(0.3)),
-          color: isDone ? Colors.green.withOpacity(0.05) : Colors.blue.withOpacity(0.02),
+          border: Border.all(color: isDone ? Colors.green : Colors.blueAccent.withValues(alpha: 0.3)),
+          color: isDone ? Colors.green.withValues(alpha: 0.05) : Colors.blue.withValues(alpha: 0.02),
         ),
         child: Row(
           children: [
@@ -164,8 +164,8 @@ class _UploadPageState extends State<UploadPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: isDone ? Colors.green : Colors.orange.withOpacity(0.3)),
-        color: isDone ? Colors.green.withOpacity(0.05) : Colors.orange.withOpacity(0.02),
+        border: Border.all(color: isDone ? Colors.green : Colors.orange.withValues(alpha: 0.3)),
+        color: isDone ? Colors.green.withValues(alpha: 0.05) : Colors.orange.withValues(alpha: 0.02),
       ),
       child: Column(
         children: [
