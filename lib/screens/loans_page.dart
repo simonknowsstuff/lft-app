@@ -22,8 +22,6 @@ class LoansPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('loans')
             .where('userId', isEqualTo: uid)
-        // Tip: If you want these ordered by time, add .orderBy('createdAt', descending: true)
-        // Note: This may require creating a Firestore Index via the link in your console.
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -55,10 +53,12 @@ class LoansPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final loan = loans[index].data() as Map<String, dynamic>;
 
-              // Handle field names carefully (checking both camelCase and snake_case)
-              final String status = (loan['status'] ?? 'unknown').toString().toLowerCase();
+              // Map 'flagged' to 'rejected' at the data level
+              String status = (loan['status'] ?? 'unknown').toString().toLowerCase();
+              if (status == 'flagged') status = 'rejected';
+
               final createdAt = (loan['createdAt'] as Timestamp?)?.toDate();
-              final String? rejectionReason = loan['rejectionReason'] ?? loan['rejection_reason'];
+              final String? rejectionReason = loan['flagReason'] ?? loan['rejectionReason'];
               final String productName = loan['productName'] ?? loan['product_name'] ?? "Loan Application";
 
               Color statusColor;
@@ -66,6 +66,7 @@ class LoansPage extends StatelessWidget {
 
               switch (status) {
                 case 'verified':
+                case 'approved':
                   statusColor = Colors.green;
                   statusIcon = Icons.check_circle;
                   break;
@@ -147,7 +148,6 @@ class LoansPage extends StatelessWidget {
                           style: TextStyle(color: Colors.grey[600], fontSize: 13),
                         ),
 
-                        // --- REJECTION REASON SECTION ---
                         if (status == 'rejected') ...[
                           const Divider(height: 24),
                           Row(
